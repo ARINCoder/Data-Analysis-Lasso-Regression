@@ -1,0 +1,166 @@
+---
+title: "Modelling"
+author: '.'
+date: "2024-04-29"
+output:
+  pdf_document: default
+  html_document: default
+knitr:
+  cache: false
+---
+
+
+```{r}
+rm(list = ls())
+```
+
+
+##Question1
+```{r}
+library(ggplot2)
+library(MASS)
+data("Boston")
+head(Boston)
+attach(Boston)
+Boston1 <- lm( medv ~ crim + rm + age + dis + ptratio, data = Boston )
+##Plotting the Residuals versus the fitted values.
+fitted_values <- fitted.values(Boston1)
+residual <- residuals(Boston1)
+plot( fitted_values, residual, 
+      xlab = "Fitted values",
+      ylab = " Residuals", 
+      main = "The Plot of the Residuals versus the Fitted Values", 
+      abline( h=0, col = "red", lty = 2))
+```
+##From the plot above, it can be concluded that:
+##1.Linearity: The plot can tell whether there is a relationship between the independent variables, and the dependent variable. From the plot there is no clear nonlinear pattern suggesting the model might be appropriate.
+##2. There are clear outliers, which might have significant impact on the model's coefficients.
+##3. There is a random scatter of points around the line y=0, indicating that the residuals have no systematic pattern suggesting the model's assumptions are met.
+
+
+##QQ-Plot
+```{r}
+residuals_qq <- residuals(Boston1)
+##Creating the QQ Plot.
+qqnorm(residuals_qq)
+## Adding a reference line.
+qqline(residuals_qq, col = "blue", lwd = 2)
+
+```
+##The QQ plot above we assess how closely the observed quantiles of the residuals match the quantiles expected from a normal distribution. 
+##1. The points falls approximately along the blue straight line, suggesting the residuals follows a normal distribution.
+##2. There is no deviation in the middle section of the plot which also suggest normality.
+##3. There is also outlies as seen in the plot. 
+
+
+##The Histogram
+```{r}
+residuals_hist <- residuals(Boston1)
+##Plotting the Histogram
+hist(residuals_hist, main = "Histogram of Residuals", xlab = "Residuals", freq = FALSE)
+##Adding a density curve
+lines(density(residuals_hist), col = "blue", lwd = 1)
+
+```
+##From the Histogram above I can conclude that:
+## From the shape of the Histogram which is bell-shaped suggests that the residuals are noramally distributed.
+##From the Histogram, I can conclude that there are outliers.Also the Spreas of the histogram is consistent across the range of the residuals which indicates the variability of the residuals.
+
+##Question2: Lasso Regression.
+```{r}
+library(Ecdat)
+library(glmnet)
+library(useful)
+##Exploring the dataset
+# Use build.x and build.y functions 
+y <- Griliches$lw80
+X <- build.x(data = Griliches, formula = lw80 ~ .)
+##The Lasso Model
+lasso_model <- glmnet(X, y)
+##The Cross_Validation 
+cv_lasso <- cv.glmnet(X, y)
+```
+
+##I fitted the ridge regression model using cv.glmnet which will do the cross validation for us with alpha = 1 as default
+##To determine what value to use for lambda, I’ll perform k-fold cross-validation and identify the lambda value that produces the lowest test mean squared error (MSE).
+```{r}
+##Plot the Lasso Model
+plot(lasso_model, xvar = "lambda", label = TRUE)
+```
+##From the plot some coeeficients start off from zero and shot to different directions.
+```{r}
+##Plot the cross-validated error versus log(lambda)
+plot(cv_lasso)
+```
+##The cross-validation curve helps in selecting the optimal value of lambda by showing how the model's performance changes as lambda varies. Typically, one would choose the value of lambda that minimizes the cross-validated error, indicated by the point where the curve reaches its lowest value.
+##The minimum cross vailation error is at size 13 and with 1 std error we have a model of size 10
+```{r}
+coef(cv_lasso)
+```
+##I will extract the coefficients from the CV objects, it will pick the coefficient vector corresponding to the best modle, which is the model of size 10.
+##Also, Notice that some coefficents are 0.
+
+```{r}
+##Select the lambda that minimizes cross-validated error
+best_lambda <- cv_lasso$lambda.min
+cat("Best Lambda", best_lambda, "\n")
+
+```
+##The lambda parameter controls the amount of regularization applied to the model. The best lambda is 0.006290102 
+
+```{r}
+###How increasing lmbda shrinks coeeficients
+##The more coefficients shrinks towars zero, the higher the lambda
+res <- glmnet( X, y, alpha = 1, standardize = TRUE)
+plot(res, xvar = "lambda")
+legend("bottomleft", lwd = 1, col = 1:10, legend = colnames(X), cex = 0.7)
+
+```
+##plotting the shrinkage path without a specific lambda value provides insights into how the Lasso model behaves under different levels of regularization, helping to interpret feature importance and understand the trade-offs between model complexity and sparsity.
+
+##Question3. GAM Model
+```{r}
+library(lattice)
+library(mgcv)
+data("environmental")
+plot(environmental)
+```
+##From the scatter plot of the dataset the variables are continous.
+
+```{r}
+##Viewing the column names
+##Fitting a GAM of temp agaisnt the atmospheric conditions
+gam_model <- gam(temperature ~ s(ozone) + s(radiation) + s(wind), data = environmental)
+##Plotting plots to visualize the realtionships
+plot.gam(gam_model, pages = 1, main = "The plot of the GAM Model")
+```
+##From the Plots, a non-linear realtionship is evident by non-straight lines in the plot for the three variables.
+```{r}
+summary(gam_model)
+```
+
+##However, using edf, the edf for s(ozone) is  2.879, and that ofor s(wind) is  8.601 suggesting a potentially non-linear relationship between temperature and (ozone and wind).
+##On the other hand the edf for s(radiation) is 1.696 which suggest that the relationship between temperature and s(radiation) is closer to linear.
+
+##Question4. the Hstarts dataset.
+```{r}
+library(Ecdat)
+library(forecast)
+##Laoding the dataset
+data("Hstarts")
+##colnames(Hstarts)
+##Converting the hs column to a Time Series 
+hs_ts <- ts(Hstarts[, "hs"], start = 1960, end = 2001)
+##Multi-panel plot
+par(mfrow = c(1,3))
+##Plot the time series
+plot(hs_ts, main = "Housing Starts Time Series", xlab = "Year", ylab = "Housing Starts")
+##Plot the Auto-correlation function plot
+acf( hs_ts, main = "AutoCorrelation Function {ACF} For Housing Starts")
+##Plot the Partial Auto-Correlation Function (PACF)
+pacf( hs_ts, main = "Partial Autocorrelation Function (PACF) For Housing Starts")
+```
+
+
+
+
